@@ -12,6 +12,10 @@
 - **Versatile Export:** Documents can be exported as Markdown (.md), PDF, or plain text (.txt).
 - **Simple Installation:** No database required – runs on any PHP-enabled web server.
 
+![Preview](preview.png)
+
+
+
 ---
 
 ## 🛠 Prerequisites
