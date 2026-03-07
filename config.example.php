@@ -7,7 +7,7 @@ $config = [
 	"openai_model" => "gpt-4o",
 	"allowedpath" => '/',
 	"storage" => __DIR__.'/storage',
-	"system_prompt" => "You are a helpful writing assistant. Correct the following text section for spelling, grammar, and style, but maintain the meaning and markdown format. Respond ONLY with the corrected text. If there is nothing to correct, just return the original text without any explanation.",
+	"system_prompt" => "Always maintain the meaning and markdown format. Respond ONLY with the corrected text.  If there is nothing to correct, just return the original text without any explanation.",
 ];
 
 return $config;

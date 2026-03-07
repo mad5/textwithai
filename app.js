@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('modal');
     const modalCancel = document.getElementById('modal-cancel');
     const modalOk = document.getElementById('modal-ok');
+    const modalTitle = document.getElementById('modal-title');
     const newFilenameInput = document.getElementById('new-filename');
     const editorArea = document.getElementById('editor-area');
     const welcomeScreen = document.getElementById('welcome-screen');
@@ -19,8 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyMarkdownBtn = document.getElementById('copy-markdown');
     const copyHtmlBtn = document.getElementById('copy-html');
     const copyTextBtn = document.getElementById('copy-text');
+    const assistantSelect = document.getElementById('assistant-select');
 
     let currentFile = null;
+    let modalMode = 'create'; // 'create' or 'rename'
+    let selectedAssistant = 'Classic';
     let paragraphs = []; // Array of { original: string, corrected: string, processing: boolean }
     let processTimeout = null;
 
@@ -61,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.innerHTML = `
                     <span class="truncate flex-1 flex items-center">
                         <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        ${file.name}
+                        ${file.name.replace(/\.md$/, '')}
                     </span>
                     <span class="text-xs text-gray-500">${new Date(file.mtime * 1000).toLocaleDateString()}</span>
                 `;
@@ -73,13 +77,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const loadAssistants = async () => {
+        try {
+            const response = await fetch('api.php?action=list_assistants');
+            const assistants = await response.json();
+            assistantSelect.innerHTML = '';
+            assistants.forEach(assistant => {
+                const option = document.createElement('option');
+                option.value = assistant;
+                option.textContent = assistant.charAt(0).toUpperCase() + assistant.slice(1);
+                assistantSelect.appendChild(option);
+            });
+            assistantSelect.value = selectedAssistant;
+        } catch (error) {
+            console.error('Error loading assistants:', error);
+        }
+    };
+
     const loadFile = async (name, updateUrl = true) => {
         try {
             const response = await fetch(`api.php?action=read&name=${encodeURIComponent(name)}`);
             const data = await response.json();
             if (data.content !== undefined) {
                 currentFile = name;
-                currentFilenameDisplay.textContent = name;
+                currentFilenameDisplay.textContent = name.replace(/\.md$/, '');
+                selectedAssistant = data.assistant || 'Classic';
+                assistantSelect.value = selectedAssistant;
                 
                 // Update URL if requested
                 if (updateUrl) {
@@ -126,6 +149,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const renameCurrentFile = async () => {
+        const newName = newFilenameInput.value.trim();
+        if (!newName || !currentFile || newName === currentFile) {
+            modal.classList.add('hidden');
+            return;
+        }
+
+        try {
+            const response = await fetch('api.php?action=rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oldName: currentFile, newName: newName })
+            });
+            const data = await response.json();
+            if (data.success) {
+                modal.classList.add('hidden');
+                currentFile = data.newName;
+                currentFilenameDisplay.textContent = currentFile.replace(/\.md$/, '');
+                
+                // Update URL
+                const url = new URL(window.location);
+                url.searchParams.set('file', currentFile);
+                window.history.replaceState({ file: currentFile }, '', url);
+                
+                await loadFileList();
+            } else {
+                alert(data.error || 'Error renaming file');
+            }
+        } catch (error) {
+            console.error('Error renaming file:', error);
+        }
+    };
+
     const saveCurrentFile = async () => {
         if (!currentFile) return;
         const content = easyMDE.value();
@@ -146,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetch('api.php?action=save_revisions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: currentFile, revisions: paragraphs })
+                body: JSON.stringify({ name: currentFile, revisions: paragraphs, assistant: selectedAssistant })
             });
         } catch (error) {
             console.error('Error saving revisions:', error);
@@ -231,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('api.php?action=process_paragraph', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: p.original })
+                body: JSON.stringify({ text: p.original, assistant: selectedAssistant })
             });
             const data = await response.json();
             if (data.corrected) {
@@ -399,17 +455,56 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshFilesBtn.onclick = loadFileList;
     
     newFileBtn.onclick = () => {
+        modalMode = 'create';
+        modalTitle.textContent = 'Create New File';
+        newFilenameInput.value = '';
         modal.classList.remove('hidden');
         newFilenameInput.focus();
     };
-    
+
+    currentFilenameDisplay.onclick = () => {
+        if (!currentFile) return;
+        modalMode = 'rename';
+        modalTitle.textContent = 'Rename File';
+        newFilenameInput.value = currentFile;
+        modal.classList.remove('hidden');
+        newFilenameInput.focus();
+    };
+
     modalCancel.onclick = () => {
         modal.classList.add('hidden');
         newFilenameInput.value = '';
     };
 
-    modalOk.onclick = createNewFile;
-    newFilenameInput.onkeyup = (e) => { if (e.key === 'Enter') createNewFile(); };
+    modalOk.onclick = () => {
+        if (modalMode === 'create') {
+            createNewFile();
+        } else {
+            renameCurrentFile();
+        }
+    };
+
+    newFilenameInput.onkeyup = (e) => {
+        if (e.key === 'Enter') {
+            if (modalMode === 'create') {
+                createNewFile();
+            } else {
+                renameCurrentFile();
+            }
+        }
+    };
+
+    assistantSelect.onchange = () => {
+        selectedAssistant = assistantSelect.value;
+        if (currentFile) {
+            saveRevisions();
+            // Re-process all paragraphs
+            paragraphs.forEach((p, index) => {
+                p.dirty = true;
+                processParagraphWithAI(index);
+            });
+        }
+    };
 
     easyMDE.codemirror.on('change', () => {
         if (processTimeout) clearTimeout(processTimeout);
@@ -421,6 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial Load
     loadFileList();
+    loadAssistants();
 
     // Check URL for file parameter
     const urlParams = new URLSearchParams(window.location.search);

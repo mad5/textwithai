@@ -60,7 +60,7 @@
             <h1 class="text-xl font-bold">TextWithAI</h1>
         </div>
         <div>
-            <span id="current-filename" class="italic mr-4">No file selected</span>
+            <span id="current-filename" class="italic mr-4 border border-transparent hover:border-blue-300 hover:bg-blue-500 px-2 py-1 rounded cursor-pointer transition-colors" title="Click to rename">No file selected</span>
             <button id="new-file-btn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded text-white transition inline-flex items-center">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 New
@@ -119,6 +119,11 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="flex-1 flex justify-center px-4">
+                            <select id="assistant-select" class="bg-gray-100 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full max-w-xs p-1">
+                                <option value="Classic">Classic Assistant</option>
+                            </select>
+                        </div>
                         <div class="flex space-x-2">
                             <div class="relative group">
                                 <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm flex items-center transition">
@@ -149,11 +154,11 @@
     <!-- Modal for new filename -->
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
         <div class="bg-white p-6 rounded-lg shadow-xl w-96">
-            <h3 class="text-lg font-bold mb-4">Create New File</h3>
+            <h3 id="modal-title" class="text-lg font-bold mb-4">Create New File</h3>
             <input type="text" id="new-filename" class="w-full border p-2 mb-4 rounded border-gray-300 focus:border-blue-500 outline-none" placeholder="Filename (e.g. note.md)">
             <div class="flex justify-end gap-2">
                 <button id="modal-cancel" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded">Cancel</button>
-                <button id="modal-ok" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Create</button>
+                <button id="modal-ok" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Confirm</button>
             </div>
         </div>
     </div>
