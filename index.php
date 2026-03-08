@@ -182,6 +182,18 @@
         </div>
     </div>
 
+    <!-- Modal for custom prompt -->
+    <div id="prompt-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 class="text-lg font-bold mb-4">Text überarbeiten</h3>
+            <textarea id="custom-prompt-input" class="w-full border p-2 mb-4 rounded border-gray-300 focus:border-blue-500 outline-none h-32" placeholder="Wie soll der Text überarbeitet werden? (z.B. 'Fasse den Text zusammen' oder 'Schreibe es förmlicher')"></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="prompt-cancel" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded">Abbrechen</button>
+                <button id="prompt-ok" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Überarbeiten</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js?_=<?= time();?>"></script>
 </body>
 </html>

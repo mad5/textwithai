@@ -166,6 +166,7 @@ switch ($action) {
         $data = json_decode(file_get_contents('php://input'), true);
         $text = $data['text'] ?? '';
         $assistant = $data['assistant'] ?? 'Classic';
+        $customPrompt = $data['custom_prompt'] ?? '';
         if (empty(trim($text))) {
             echo json_encode(['original' => $text, 'corrected' => $text]);
             exit;
@@ -178,7 +179,14 @@ switch ($action) {
             if (file_exists($assistantPath)) {
                 $assistantPrompt = trim(file_get_contents($assistantPath)) . "\n\n";
             }
-            $system_prompt = $assistantPrompt . ($config['system_prompt'] ?? "Correct this text section.");
+
+            $baseSystemPrompt = $config['system_prompt'] ?? "Correct this text section.";
+            if ($customPrompt) {
+                $system_prompt = $assistantPrompt . $baseSystemPrompt . "\n\nFühre die folgende Überarbeitung am Text durch: " . $customPrompt;
+            } else {
+                $system_prompt = $assistantPrompt . $baseSystemPrompt;
+            }
+
             $client->generate($text, $system_prompt);
             $corrected = $client->getResponseText();
             echo json_encode(['original' => $text, 'corrected' => $corrected]);

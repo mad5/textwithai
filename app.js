@@ -56,12 +56,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyDropdown = document.getElementById('copy-dropdown');
     const exportBtn = document.getElementById('export-btn');
     const copyBtn = document.getElementById('copy-btn');
+    const promptModal = document.getElementById('prompt-modal');
+    const promptCancel = document.getElementById('prompt-cancel');
+    const promptOk = document.getElementById('prompt-ok');
+    const customPromptInput = document.getElementById('custom-prompt-input');
 
     let currentFile = null;
     let modalMode = 'create'; // 'create' or 'rename'
     let selectedAssistant = 'Classic';
     let paragraphs = []; // Array of { original: string, corrected: string, processing: boolean }
     let processTimeout = null;
+    let currentPromptIndex = null;
 
     // Initialize EasyMDE
     const easyMDE = new EasyMDE({
@@ -348,6 +353,79 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const processParagraphWithCustomPrompt = async (index, customPrompt) => {
+        const p = paragraphs[index];
+        if (!p || !p.original.trim()) return;
+
+        p.processing = true;
+        renderPreview();
+
+        try {
+            const response = await fetch('api.php?action=process_paragraph', {
+                method: 'POST',
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ 
+                    text: p.original, 
+                    assistant: selectedAssistant,
+                    custom_prompt: customPrompt 
+                })
+            });
+            const data = await response.json();
+            if (data.corrected) {
+                p.corrected = data.corrected;
+                saveRevisions();
+            }
+        } catch (error) {
+            console.error('Error during AI processing:', error);
+        } finally {
+            p.processing = false;
+            renderPreview();
+        }
+    };
+
+    const showContextMenu = (e, index) => {
+        // Remove existing context menu if any
+        const existing = document.getElementById('context-menu');
+        if (existing) existing.remove();
+
+        const menu = document.createElement('div');
+        menu.id = 'context-menu';
+        menu.className = 'fixed bg-white border border-gray-200 rounded shadow-lg z-[100] py-1 w-40';
+        
+        // Calculate position to keep it in view
+        let top = e.clientY;
+        let left = e.clientX - 160;
+        
+        if (left < 0) left = e.clientX + 10;
+        if (top + 50 > window.innerHeight) top = window.innerHeight - 60;
+
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+
+        const reviseItem = document.createElement('button');
+        reviseItem.className = 'w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center';
+        reviseItem.innerHTML = '<i class="fas fa-edit mr-2 text-blue-500"></i> Überarbeiten';
+        reviseItem.onclick = () => {
+            currentPromptIndex = index;
+            customPromptInput.value = '';
+            promptModal.classList.remove('hidden');
+            customPromptInput.focus();
+            menu.remove();
+        };
+
+        menu.appendChild(reviseItem);
+        document.body.appendChild(menu);
+
+        // Close menu on click outside
+        const closeMenu = (ev) => {
+            if (!menu.contains(ev.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    };
+
     const acceptRevision = (index) => {
         const p = paragraphs[index];
         if (!p || p.processing) return;
@@ -393,6 +471,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const container = document.createElement('div');
             container.className = `relative group flex-1 min-w-0 p-3 ${isChanged ? 'bg-blue-50/50 rounded-lg' : ''} transition-all`;
+
+            // Menu button (3 dots)
+            const menuBtn = document.createElement('button');
+            menuBtn.innerHTML = '<i class="fas fa-ellipsis-v"></i>';
+            menuBtn.className = 'absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-600 transition-opacity z-20';
+            menuBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showContextMenu(e, index);
+            };
+            container.appendChild(menuBtn);
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'prose prose-slate max-w-none';
@@ -564,6 +653,24 @@ document.addEventListener('DOMContentLoaded', () => {
             createNewFile();
         } else {
             renameCurrentFile();
+        }
+    };
+
+    promptCancel.onclick = () => {
+        promptModal.classList.add('hidden');
+    };
+
+    promptOk.onclick = () => {
+        const promptText = customPromptInput.value.trim();
+        if (promptText && currentPromptIndex !== null) {
+            processParagraphWithCustomPrompt(currentPromptIndex, promptText);
+            promptModal.classList.add('hidden');
+        }
+    };
+
+    customPromptInput.onkeyup = (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            promptOk.onclick();
         }
     };
 
