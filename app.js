@@ -1,4 +1,35 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // User-ID für nutzerbezogenen Storage: beim ersten Aufruf UUID erzeugen und in localStorage speichern
+    const USERID_KEY = 'textwithki_userid';
+    const getUserId = () => {
+        let id = localStorage.getItem(USERID_KEY);
+        console.log('getUserId: initial id from localStorage:', id);
+        if (!id) {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                id = crypto.randomUUID();
+                console.log('getUserId: generated via crypto.randomUUID:', id);
+            } else {
+                // Fallback for non-secure contexts (HTTP) or older browsers
+                id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+                console.log('getUserId: generated via fallback:', id);
+            }
+            localStorage.setItem(USERID_KEY, id);
+            console.log('getUserId: stored in localStorage:', localStorage.getItem(USERID_KEY));
+        }
+        return id || '';
+    };
+
+    // Initialize User-ID immediately
+    getUserId();
+
+    const apiHeaders = (extra = {}) => ({
+        'X-User-Id': getUserId(),
+        ...extra,
+    });
+
     // DOM Elements
     const sidebar = document.getElementById('sidebar');
     const toggleSidebarBtn = document.getElementById('toggle-sidebar');
@@ -21,6 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyHtmlBtn = document.getElementById('copy-html');
     const copyTextBtn = document.getElementById('copy-text');
     const assistantSelect = document.getElementById('assistant-select');
+    const exportDropdown = document.getElementById('export-dropdown');
+    const copyDropdown = document.getElementById('copy-dropdown');
+    const exportBtn = document.getElementById('export-btn');
+    const copyBtn = document.getElementById('copy-btn');
 
     let currentFile = null;
     let modalMode = 'create'; // 'create' or 'rename'
@@ -56,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadFileList = async () => {
         try {
-            const response = await fetch('api.php?action=list');
+            const response = await fetch('api.php?action=list', { headers: apiHeaders() });
             const files = await response.json();
             fileList.innerHTML = '';
             files.forEach(file => {
@@ -79,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadAssistants = async () => {
         try {
-            const response = await fetch('api.php?action=list_assistants');
+            const response = await fetch('api.php?action=list_assistants', { headers: apiHeaders() });
             const assistants = await response.json();
             assistantSelect.innerHTML = '';
             assistants.forEach(assistant => {
@@ -96,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadFile = async (name, updateUrl = true) => {
         try {
-            const response = await fetch(`api.php?action=read&name=${encodeURIComponent(name)}`);
+            const response = await fetch(`api.php?action=read&name=${encodeURIComponent(name)}`, { headers: apiHeaders() });
             const data = await response.json();
             if (data.content !== undefined) {
                 currentFile = name;
@@ -132,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('api.php?action=create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ name })
             });
             const data = await response.json();
@@ -150,8 +185,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renameCurrentFile = async () => {
-        const newName = newFilenameInput.value.trim();
-        if (!newName || !currentFile || newName === currentFile) {
+        const newNameInput = newFilenameInput.value.trim();
+        if (!newNameInput || !currentFile) {
+            modal.classList.add('hidden');
+            return;
+        }
+
+        // Add extension if missing for comparison
+        let newName = newNameInput;
+        if (!newName.endsWith('.md')) {
+            newName += '.md';
+        }
+
+        if (newName === currentFile) {
             modal.classList.add('hidden');
             return;
         }
@@ -159,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('api.php?action=rename', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ oldName: currentFile, newName: newName })
             });
             const data = await response.json();
@@ -188,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await fetch('api.php?action=save', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ name: currentFile, content })
             });
         } catch (error) {
@@ -201,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await fetch('api.php?action=save_revisions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ name: currentFile, revisions: paragraphs, assistant: selectedAssistant })
             });
         } catch (error) {
@@ -286,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('api.php?action=process_paragraph', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ text: p.original, assistant: selectedAssistant })
             });
             const data = await response.json();
@@ -378,6 +424,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return tempDiv.innerText || tempDiv.textContent || "";
     };
 
+    const getOriginalMarkdown = () => {
+        return easyMDE.value();
+    };
+
+    const getOriginalHtml = () => {
+        return marked.parse(getOriginalMarkdown());
+    };
+
+    const getOriginalText = () => {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = getOriginalHtml();
+        return tempDiv.innerText || tempDiv.textContent || "";
+    };
+
     const downloadFile = (content, filename, contentType) => {
         const a = document.createElement('a');
         const file = new Blob([content], { type: contentType });
@@ -391,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (type === 'text/html') {
                 const blob = new Blob([text], { type: 'text/html' });
-                const data = [new ClipboardItem({ 'text/html': blob, 'text/plain': new Blob([getFullCorrectedText()], { type: 'text/plain' }) })];
+                const data = [new ClipboardItem({ 'text/html': blob, 'text/plain': new Blob([getOriginalText()], { type: 'text/plain' }) })];
                 await navigator.clipboard.write(data);
             } else {
                 await navigator.clipboard.writeText(text);
@@ -412,21 +472,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Events ---
 
     exportMarkdownBtn.onclick = () => {
-        const content = getFullCorrectedMarkdown();
+        const content = getOriginalMarkdown();
         const filename = (currentFile || 'export.md').replace(/\.[^/.]+$/, "") + ".md";
         downloadFile(content, filename, 'text/markdown');
+        exportDropdown.classList.add('hidden');
     };
 
     exportTextBtn.onclick = () => {
-        const content = getFullCorrectedText();
+        const content = getOriginalText();
         const filename = (currentFile || 'export.txt').replace(/\.[^/.]+$/, "") + ".txt";
         downloadFile(content, filename, 'text/plain');
+        exportDropdown.classList.add('hidden');
     };
 
     exportPdfBtn.onclick = () => {
         const element = document.createElement('div');
         element.className = 'prose prose-slate max-w-none p-8';
-        element.innerHTML = getFullCorrectedHtml();
+        element.innerHTML = getOriginalHtml();
         
         const opt = {
             margin: 10,
@@ -437,19 +499,40 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         html2pdf().set(opt).from(element).save();
+        exportDropdown.classList.add('hidden');
     };
 
     copyMarkdownBtn.onclick = (e) => {
-        copyToClipboard(getFullCorrectedMarkdown());
+        copyToClipboard(getOriginalMarkdown());
+        copyDropdown.classList.add('hidden');
     };
 
     copyHtmlBtn.onclick = (e) => {
-        copyToClipboard(getFullCorrectedHtml(), 'text/html');
+        copyToClipboard(getOriginalHtml(), 'text/html');
+        copyDropdown.classList.add('hidden');
     };
 
     copyTextBtn.onclick = (e) => {
-        copyToClipboard(getFullCorrectedText());
+        copyToClipboard(getOriginalText());
+        copyDropdown.classList.add('hidden');
     };
+
+    exportBtn.onclick = (e) => {
+        e.stopPropagation();
+        exportDropdown.classList.toggle('hidden');
+        copyDropdown.classList.add('hidden');
+    };
+
+    copyBtn.onclick = (e) => {
+        e.stopPropagation();
+        copyDropdown.classList.toggle('hidden');
+        exportDropdown.classList.add('hidden');
+    };
+
+    document.addEventListener('click', () => {
+        exportDropdown.classList.add('hidden');
+        copyDropdown.classList.add('hidden');
+    });
 
     toggleSidebarBtn.onclick = toggleSidebar;
     refreshFilesBtn.onclick = loadFileList;
@@ -466,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentFile) return;
         modalMode = 'rename';
         modalTitle.textContent = 'Rename File';
-        newFilenameInput.value = currentFile;
+        newFilenameInput.value = currentFile.replace(/\.md$/, '');
         modal.classList.remove('hidden');
         newFilenameInput.focus();
     };

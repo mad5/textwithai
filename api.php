@@ -7,7 +7,21 @@ include_once 'ai/AiClient.php';
 
 $action = $_GET['action'] ?? '';
 
-$storage = $config['storage'];
+// Nutzer-Subordner: bei "userid" => "browser" aus Request (Header/GET), sonst "default"
+$baseStorage = $config['storage'];
+$userFolder = 'default';
+if (($config['userid'] ?? '') === 'browser') {
+	$raw = $_SERVER['HTTP_X_USER_ID'] ?? $_GET['userid'] ?? '';
+	$raw = trim((string) $raw);
+	if ($raw !== '' && preg_match('/^[a-zA-Z0-9_\-]+$/', $raw)) {
+		$userFolder = $raw;
+	}
+}
+$storage = $baseStorage . '/' . $userFolder;
+if (!is_dir($storage)) {
+	mkdir($storage, 0775, true);
+}
+$GLOBALS['textwithki_storage'] = $storage;
 
 switch ($action) {
     case 'list':
@@ -33,7 +47,7 @@ switch ($action) {
             echo json_encode(['error' => 'Name is required']);
             exit;
         }
-        if (!str_ends_with($name, '.md')) {
+        if (substr($name, -3) !== '.md') {
             $name .= '.md';
         }
         $path = $storage . '/' . $name;
@@ -120,7 +134,7 @@ switch ($action) {
             echo json_encode(['error' => 'Old name and new name are required']);
             exit;
         }
-        if (!str_ends_with($newName, '.md')) {
+        if (substr($newName, -3) !== '.md') {
             $newName .= '.md';
         }
         $oldPath = $storage . '/' . $oldName;

@@ -33,7 +33,7 @@ function getJsonWithoutFence($resForDecode) {
 		// Ohne tool_calls: nur Fence entfernen, wenn genau am Anfang
 		if (stripos($resForDecode, '```json') === 0) {
 			$resForDecode = trim(substr($resForDecode, 7));
-			if (str_ends_with($resForDecode, '```')) {
+			if (substr($resForDecode, -3) === '```') {
 				$resForDecode = trim(substr($resForDecode, 0, -3));
 			}
 		}
@@ -44,16 +44,19 @@ function getJsonWithoutFence($resForDecode) {
 function sendlog($msg) {
 	if(!is_string($msg)) $msg = print_r($msg,1);
 	$msg = trim($msg);
-	if(!file_exists("storage/log/ai.log")) {
-		if (!is_dir("storage/log")) {
-			mkdir("storage/log", 0777, true);
+	$storageRoot = $GLOBALS['textwithki_storage'] ?? __DIR__ . '/../storage';
+	$logDir = $storageRoot . '/log';
+	$logFile = $logDir . '/ai.log';
+	if (!file_exists($logFile)) {
+		if (!is_dir($logDir)) {
+			mkdir($logDir, 0777, true);
 		}
 	}
 	$trace = getTrace(true);
 	#var_dump($trace);exit;
 	$s = basename($trace[1]["file"])."/".$trace[1]["line"];
 	$line = "****************************************************\n".date("Y-m-d H:i:s")."\t".$s."\n".$msg;
-	file_put_contents("storage/log/ai.log", $line."\n\n", FILE_APPEND);
+	file_put_contents($logFile, $line."\n\n", FILE_APPEND);
 	
 	// Logs auf stderr ausgeben, damit stdout für die eigentliche Antwort (JSON oder Content) sauber bleibt
 	//file_put_contents('php://stderr', substr($line, 0, 1000) . "\n\n");

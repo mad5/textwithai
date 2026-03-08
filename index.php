@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TextWithAI - Markdown Editor</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="preview.png">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker registered.'))
+                    .catch(err => console.log('Service Worker registration failed: ', err));
+            });
+        }
+    </script>
     <!-- Tailwind CSS & Typography -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <!-- Font Awesome -->
@@ -86,11 +98,18 @@
         <main class="flex-1 flex flex-col overflow-hidden">
             <!-- Welcome Screen (Placeholder) -->
             <div id="welcome-screen" class="flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-500">
-                <svg class="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+
+				<!--
+				<svg class="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
-                <h2 class="text-2xl font-bold mb-2">Welcome to TextWithKI</h2>
+				-->
+
+				<img src="icon.png" style="max-width: 128px;margin-bottom:20px;">
+
+                <h2 class="text-2xl font-bold mb-2">Welcome to TextWithAI</h2>
                 <p>Select a file from the sidebar or create a new one.</p>
+
             </div>
 
             <div id="editor-area" class="flex-1 flex overflow-hidden hidden">
@@ -100,13 +119,13 @@
                 </div>
                 <div class="flex-1 flex flex-col bg-gray-50 relative min-w-0">
                     <!-- Preview Toolbar -->
-                    <div class="bg-white border-b border-gray-300 p-2 flex justify-between items-center shadow-sm z-10">
+                    <div class="bg-white border-b border-gray-300 p-2 flex justify-between items-center shadow-sm z-30">
                         <div class="flex space-x-2">
                             <div class="relative group">
-                                <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center transition">
+                                <button id="export-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center transition">
                                     <i class="fas fa-download mr-1"></i> Export <i class="fas fa-chevron-down ml-1 text-xs"></i>
                                 </button>
-                                <div class="absolute left-0 mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg hidden group-hover:block z-20">
+                                <div id="export-dropdown" class="absolute left-0 mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg hidden z-40">
                                     <button id="export-markdown" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center">
                                         <i class="fab fa-markdown mr-2 text-blue-500"></i> Markdown (.md)
                                     </button>
@@ -126,10 +145,10 @@
                         </div>
                         <div class="flex space-x-2">
                             <div class="relative group">
-                                <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm flex items-center transition">
+                                <button id="copy-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm flex items-center transition">
                                     <i class="fas fa-copy mr-1"></i> Copy <i class="fas fa-chevron-down ml-1 text-xs"></i>
                                 </button>
-                                <div class="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded shadow-lg hidden group-hover:block z-20">
+                                <div id="copy-dropdown" class="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded shadow-lg hidden z-40">
                                     <button id="copy-markdown" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center">
                                         <i class="fab fa-markdown mr-2 text-blue-500"></i> As Markdown
                                     </button>
