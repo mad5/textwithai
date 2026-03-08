@@ -1,3 +1,6 @@
+<?php
+$hidetop = (isset($_GET['hidetop']) && $_GET['hidetop'] == '1');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,8 +31,11 @@
     <!-- html2pdf.js for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
+        :root {
+            --header-height: <?php echo $hidetop ? '0px' : '64px'; ?>;
+        }
         .editor-container .CodeMirror {
-            height: calc(100vh - 72px);
+            height: calc(100vh - var(--header-height) - 8px);
             font-size: 1.1rem;
             border-top: none;
             border-left: none;
@@ -50,7 +56,7 @@
             transition: margin-left 0.3s;
         }
         #preview-area {
-            height: calc(100vh - 64px - 53px); /* 64px header, 53px toolbar */
+            height: calc(100vh - var(--header-height) - 53px); /* dynamic header, 53px toolbar */
             overflow-y: auto;
         }
         .loading-paragraph {
@@ -66,6 +72,7 @@
 </head>
 <body class="bg-gray-100 h-screen flex flex-col">
 
+    <?php if (!$hidetop): ?>
     <!-- Header -->
     <header class="bg-blue-600 text-white p-4 flex justify-between items-center shadow-md">
         <div class="flex items-center">
@@ -82,6 +89,7 @@
             </button>
         </div>
     </header>
+    <?php endif; ?>
 
     <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar -->

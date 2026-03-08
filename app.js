@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPublic = urlParams.get('public') === '1';
+    const isHidetop = urlParams.get('hidetop') === '1';
+
     // User-ID für nutzerbezogenen Storage: beim ersten Aufruf UUID erzeugen und in localStorage speichern
     const USERID_KEY = 'textwithki_userid';
     const getUserId = () => {
@@ -29,6 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
         'X-User-Id': getUserId(),
         ...extra,
     });
+
+    const getApiUrl = (action, params = {}) => {
+        const queryParams = new URLSearchParams({ action, ...params });
+        if (isPublic) {
+            queryParams.set('public', '1');
+        }
+        return `api.php?${queryParams.toString()}`;
+    };
 
     // DOM Elements
     const sidebar = document.getElementById('sidebar');
@@ -78,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "image", "|", "guide"],
         status: false,
-        minHeight: "calc(100vh - 72px)", // Updated to match the CSS height of CodeMirror
+        minHeight: isHidetop ? "calc(100vh - 8px)" : "calc(100vh - 72px)", // Updated to match the presence of the header
         placeholder: "Write your markdown text here...",
     });
 
@@ -88,6 +100,11 @@ document.addEventListener('DOMContentLoaded', () => {
         gfm: true
     });
 
+    if (isPublic) {
+        if (sidebar) sidebar.classList.add('hidden');
+        if (toggleSidebarBtn) toggleSidebarBtn.classList.add('hidden');
+    }
+
     // --- Sidebar & Files ---
 
     const toggleSidebar = () => {
@@ -96,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadFileList = async () => {
         try {
-            const response = await fetch('api.php?action=list', { headers: apiHeaders() });
+            const response = await fetch(getApiUrl('list'), { headers: apiHeaders() });
             const files = await response.json();
             fileList.innerHTML = '';
             files.forEach(file => {
@@ -119,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadAssistants = async () => {
         try {
-            const response = await fetch('api.php?action=list_assistants', { headers: apiHeaders() });
+            const response = await fetch(getApiUrl('list_assistants'), { headers: apiHeaders() });
             const assistants = await response.json();
             assistantSelect.innerHTML = '';
             assistants.forEach(assistant => {
@@ -136,11 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadFile = async (name, updateUrl = true) => {
         try {
-            const response = await fetch(`api.php?action=read&name=${encodeURIComponent(name)}`, { headers: apiHeaders() });
+            const response = await fetch(getApiUrl('read', { name }), { headers: apiHeaders() });
             const data = await response.json();
             if (data.content !== undefined) {
                 currentFile = name;
-                currentFilenameDisplay.textContent = name.replace(/\.md$/, '');
+                if (currentFilenameDisplay) currentFilenameDisplay.textContent = name.replace(/\.md$/, '');
                 selectedAssistant = data.assistant || 'Classic';
                 assistantSelect.value = selectedAssistant;
                 
@@ -148,6 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (updateUrl) {
                     const url = new URL(window.location);
                     url.searchParams.set('file', name);
+                    // Remove fileid parameter if it exists
+                    url.searchParams.delete('fileid');
                     window.history.pushState({ file: name }, '', url);
                 }
                 
@@ -159,18 +178,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Reset paragraphs and load from content and revisions
                 paragraphs = [];
                 updateParagraphs(data.content, true, data.revisions || []);
+                return true;
+            } else {
+                return false;
             }
         } catch (error) {
             console.error('Error loading file:', error);
+            return false;
         }
     };
 
-    const createNewFile = async () => {
-        const name = newFilenameInput.value.trim();
-        if (!name) return;
+    const createNewFile = async (nameInput) => {
+        const name = (nameInput || newFilenameInput.value).trim();
+        if (!name) return null;
 
         try {
-            const response = await fetch('api.php?action=create', {
+            const response = await fetch(getApiUrl('create'), {
                 method: 'POST',
                 headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ name })
@@ -181,11 +204,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 newFilenameInput.value = '';
                 await loadFileList();
                 await loadFile(data.name);
+                return data.name;
             } else {
-                alert(data.error || 'Error creating file');
+                if (!nameInput) {
+                    alert(data.error || 'Error creating file');
+                }
+                return null;
             }
         } catch (error) {
             console.error('Error creating file:', error);
+            return null;
         }
     };
 
@@ -208,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch('api.php?action=rename', {
+            const response = await fetch(getApiUrl('rename'), {
                 method: 'POST',
                 headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ oldName: currentFile, newName: newName })
@@ -217,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 modal.classList.add('hidden');
                 currentFile = data.newName;
-                currentFilenameDisplay.textContent = currentFile.replace(/\.md$/, '');
+                if (currentFilenameDisplay) currentFilenameDisplay.textContent = currentFile.replace(/\.md$/, '');
                 
                 // Update URL
                 const url = new URL(window.location);
@@ -237,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentFile) return;
         const content = easyMDE.value();
         try {
-            await fetch('api.php?action=save', {
+            await fetch(getApiUrl('save'), {
                 method: 'POST',
                 headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ name: currentFile, content })
@@ -250,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveRevisions = async () => {
         if (!currentFile) return;
         try {
-            await fetch('api.php?action=save_revisions', {
+            await fetch(getApiUrl('save_revisions'), {
                 method: 'POST',
                 headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ name: currentFile, revisions: paragraphs, assistant: selectedAssistant })
@@ -335,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPreview();
 
         try {
-            const response = await fetch('api.php?action=process_paragraph', {
+            const response = await fetch(getApiUrl('process_paragraph'), {
                 method: 'POST',
                 headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ text: p.original, assistant: selectedAssistant })
@@ -361,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPreview();
 
         try {
-            const response = await fetch('api.php?action=process_paragraph', {
+            const response = await fetch(getApiUrl('process_paragraph'), {
                 method: 'POST',
                 headers: apiHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ 
@@ -623,10 +651,10 @@ document.addEventListener('DOMContentLoaded', () => {
         copyDropdown.classList.add('hidden');
     });
 
-    toggleSidebarBtn.onclick = toggleSidebar;
-    refreshFilesBtn.onclick = loadFileList;
+    if (toggleSidebarBtn) toggleSidebarBtn.onclick = toggleSidebar;
+    if (refreshFilesBtn) refreshFilesBtn.onclick = loadFileList;
     
-    newFileBtn.onclick = () => {
+    if (newFileBtn) newFileBtn.onclick = () => {
         modalMode = 'create';
         modalTitle.textContent = 'Create New File';
         newFilenameInput.value = '';
@@ -634,7 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newFilenameInput.focus();
     };
 
-    currentFilenameDisplay.onclick = () => {
+    if (currentFilenameDisplay) currentFilenameDisplay.onclick = () => {
         if (!currentFile) return;
         modalMode = 'rename';
         modalTitle.textContent = 'Rename File';
@@ -708,10 +736,22 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFileList();
     loadAssistants();
 
-    // Check URL for file parameter
-    const urlParams = new URLSearchParams(window.location.search);
+    // Check URL for file or fileid parameter
     const fileParam = urlParams.get('file');
-    if (fileParam) {
+    const fileidParam = urlParams.get('fileid');
+
+    if (fileidParam) {
+        let fileName = fileidParam;
+        if (!fileName.endsWith('.md')) {
+            fileName += '.md';
+        }
+        (async () => {
+            const success = await loadFile(fileName, true);
+            if (!success) {
+                await createNewFile(fileName);
+            }
+        })();
+    } else if (fileParam) {
         loadFile(fileParam, false);
     }
 
@@ -721,13 +761,13 @@ document.addEventListener('DOMContentLoaded', () => {
             loadFile(event.state.file, false);
         } else {
             // No file in state, maybe go back to welcome screen?
-            const urlParams = new URLSearchParams(window.location.search);
-            const fileParam = urlParams.get('file');
+            const urlParamsLocal = new URLSearchParams(window.location.search);
+            const fileParam = urlParamsLocal.get('file');
             if (fileParam) {
                 loadFile(fileParam, false);
             } else {
                 currentFile = null;
-                currentFilenameDisplay.textContent = 'No file selected';
+                if (currentFilenameDisplay) currentFilenameDisplay.textContent = 'No file selected';
                 welcomeScreen.classList.remove('hidden');
                 editorArea.classList.add('hidden');
             }

@@ -10,7 +10,9 @@ $action = $_GET['action'] ?? '';
 // Nutzer-Subordner: bei "userid" => "browser" aus Request (Header/GET), sonst "default"
 $baseStorage = $config['storage'];
 $userFolder = 'default';
-if (($config['userid'] ?? '') === 'browser') {
+if (($_GET['public'] ?? '') === '1') {
+	$userFolder = 'public';
+} elseif (($config['userid'] ?? '') === 'browser') {
 	$raw = $_SERVER['HTTP_X_USER_ID'] ?? $_GET['userid'] ?? '';
 	$raw = trim((string) $raw);
 	if ($raw !== '' && preg_match('/^[a-zA-Z0-9_\-]+$/', $raw)) {
@@ -42,7 +44,7 @@ switch ($action) {
 
     case 'create':
         $data = json_decode(file_get_contents('php://input'), true);
-        $name = $data['name'] ?? '';
+        $name = basename($data['name'] ?? '');
         if (empty($name)) {
             echo json_encode(['error' => 'Name is required']);
             exit;
@@ -73,7 +75,7 @@ switch ($action) {
         break;
 
     case 'read':
-        $name = $_GET['name'] ?? '';
+        $name = basename($_GET['name'] ?? '');
         $path = $storage . '/' . $name;
         if (!file_exists($path)) {
             echo json_encode(['error' => 'File not found']);
@@ -104,7 +106,7 @@ switch ($action) {
 
     case 'save':
         $data = json_decode(file_get_contents('php://input'), true);
-        $name = $data['name'] ?? '';
+        $name = basename($data['name'] ?? '');
         $content = $data['content'] ?? '';
         $path = $storage . '/' . $name;
         file_put_contents($path, $content);
@@ -113,7 +115,7 @@ switch ($action) {
 
     case 'save_revisions':
         $data = json_decode(file_get_contents('php://input'), true);
-        $name = $data['name'] ?? '';
+        $name = basename($data['name'] ?? '');
         $revisions = $data['revisions'] ?? [];
         $assistant = $data['assistant'] ?? 'Classic';
         $path = $storage . '/' . $name;
@@ -128,8 +130,8 @@ switch ($action) {
 
     case 'rename':
         $data = json_decode(file_get_contents('php://input'), true);
-        $oldName = $data['oldName'] ?? '';
-        $newName = $data['newName'] ?? '';
+        $oldName = basename($data['oldName'] ?? '');
+        $newName = basename($data['newName'] ?? '');
         if (empty($oldName) || empty($newName)) {
             echo json_encode(['error' => 'Old name and new name are required']);
             exit;

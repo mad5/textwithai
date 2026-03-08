@@ -5,16 +5,23 @@
 ## 🚀 Benefits & Features
 
 - **Real-time AI Assistance:** Correction of spelling, grammar, and style directly within the editor.
+- **AI Assistants & Personas:** Choose from various assistant styles (e.g., Concise, Diplomatic, Persuasive, Poet, Simplify) to rewrite your text in specific tones.
+- **Custom AI Prompts:** Manually instruct the AI on how to rewrite specific paragraphs (e.g., "Summarize this" or "Make it more formal").
+- **PWA Support:** Install TextWithAI as a Progressive Web App (PWA) on your desktop or mobile device for a native-like experience.
 - **Seamless Markdown Experience:** Uses the proven EasyMDE editor for a comfortable writing environment.
 - **Local or Cloud AI:** Full flexibility between data privacy (local via Ollama) and performance (OpenAI).
-- **File Management:** Easily create, save, and load Markdown files in local storage.
-- **Version History:** Track corrections and changes within documents.
-- **Versatile Export:** Documents can be exported as Markdown (.md), PDF, or plain text (.txt).
+- **Advanced File Management:**
+    - Create, save, and load Markdown files.
+    - Organize files in user-specific subdirectories (based on Browser UUID).
+    - Easy file renaming and refreshing the file list.
+- **Version History & Revisions:** Track corrections and changes within documents; revert to original text easily.
+- **Versatile Export & Copy Options:**
+    - Export documents as Markdown (.md), PDF, or plain text (.txt).
+    - Quick copy to clipboard as Markdown, HTML, or plain text.
+- **Responsive Design:** Optimized for both desktop and mobile use with a clean, modern interface using Tailwind CSS.
 - **Simple Installation:** No database required – runs on any PHP-enabled web server.
 
 ![Preview](preview.png)
-
-
 
 ---
 
@@ -40,9 +47,9 @@ Before installing TextWithAI, ensure your system meets the following requirement
    ```
 
 2. **Check Directory Structure:**
-   Ensure that the `storage` directory exists.
+   Ensure that the `storage` and `assistants` directories exist.
    ```bash
-   mkdir -p storage
+   mkdir -p storage assistants
    ```
 
 3. **Set Permissions:**
@@ -81,7 +88,8 @@ All configuration is done via the `config.php` file.
        "openai_model"  => "gpt-4o",
        
        "storage"       => __DIR__.'/storage',
-       "system_prompt" => "You are a helpful writing assistant. Correct the following text section...",
+       "userid"        => "browser", // "browser" = UUID per browser, else "default"
+       "system_prompt" => "Maintain meaning and markdown format. Respond ONLY with corrected text.",
    ];
    return $config;
    ```
@@ -90,7 +98,14 @@ All configuration is done via the `config.php` file.
 - `llm`: Determines which service is used for AI processing.
 - `ollama_url`: The address of your local Ollama server.
 - `openai_key`: Your secret API key from OpenAI (only required if `llm` is set to `openai`).
-- `system_prompt`: Here you can define how the AI should behave (e.g., language, tone, level of correction).
+- `userid`: Setting this to `"browser"` enables multi-user support where each browser gets its own storage folder.
+- `system_prompt`: Define how the AI should behave globally (e.g., language, tone).
+
+### URL Parameters:
+You can use the following parameters in the URL to control the behavior of the application:
+- `fileid`: Loads a specific file directly on startup (e.g., `?fileid=MyDocument`). If the file does not exist, it will be created automatically.
+- `public`: Use `?public=1` to use a shared public storage folder instead of a private user-specific directory.
+- `hidetop`: Use `?hidetop=1` to hide the top navigation bar (ideal for embedding the editor).
 
 ---
 
@@ -100,8 +115,14 @@ All configuration is done via the `config.php` file.
 2. Create a new file using the **"New"** button at the top right.
 3. Select a file from the left sidebar.
 4. Write your text in the left editor area.
-5. The AI processes your paragraphs automatically (depending on the implementation upon saving or via specific triggers) and displays correction suggestions.
-6. Use the **Export** button to download your finished work.
+5. **AI Interaction:**
+    - The AI automatically processes your paragraphs and displays suggestions in the preview area.
+    - Use the **Assistant dropdown** to change the persona/style of the AI.
+    - Click on a paragraph in the preview to enter a **custom prompt** for specific adjustments.
+6. **Management:**
+    - Click the filename in the header to **rename** the current file.
+    - Use the **Copy** button to copy your text in different formats (Markdown, HTML, Text).
+    - Use the **Export** button to download your finished work as .md, .pdf, or .txt.
 
 ---
 
