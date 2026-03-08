@@ -59,6 +59,9 @@
             padding: 5px;
             border-radius: 4px;
         }
+		.prose-slate {
+			padding-right: 10px;
+		}
     </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col">
