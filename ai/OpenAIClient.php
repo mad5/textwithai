@@ -6,15 +6,18 @@
  */
 class OpenAIClient
 {
-    private string $apiKey;
+	private string $baseUrl = 'https://api.openai.com';
+
+	private string $apiKey;
     private string $model;
     private ?array $lastResponse = null;
     private ?array $lastHistory = null;
 
-    public function __construct(string $apiKey, string $model = 'gpt-4o')
+    public function __construct(string $apiKey, string $model = 'gpt-4o', string $baseUrl = 'https://api.openai.com')
     {
         $this->apiKey = $apiKey;
         $this->model = $model;
+		$this->baseUrl = rtrim($baseUrl, '/');
     }
 
     /**
@@ -111,17 +114,29 @@ class OpenAIClient
 
     private function request(string $path, array $body): array
     {
-        $url = 'https://api.openai.com' . $path;
+        //$url = 'https://api.openai.com' . $path;
+		if (substr($this->baseUrl,-4) == '.php') {
+			$url = $this->baseUrl;
+		} else {
+			$url = $this->baseUrl . $path;
+		}
         $json = json_encode($body, JSON_THROW_ON_ERROR);
+
+        $headers = "Content-Type: application/json\r\n";
+        if ($this->apiKey !== "") {
+            $headers .= "Authorization: Bearer " . $this->apiKey . "\r\n";
+            // Zusätzlicher Header für den Proxy, falls das Backend Authentifizierung benötigt
+            $headers .= "X-Backend-Auth: Bearer " . $this->apiKey . "\r\n";
+        }
+        $headers .= "Content-Length: " . strlen($json) . "\r\n";
 
         $ctx = stream_context_create([
             'http' => [
                 'method'  => 'POST',
-                'header'  => "Content-Type: application/json\r\n" .
-                             "Authorization: Bearer " . $this->apiKey . "\r\n" .
-                             "Content-Length: " . strlen($json),
+                'header'  => $headers,
                 'content' => $json,
                 'timeout' => 120.0,
+                'ignore_errors' => true,
             ],
         ]);
 
@@ -129,12 +144,12 @@ class OpenAIClient
 
         if ($raw === false) {
             $err = error_get_last();
-            throw new RuntimeException('OpenAI-Anfrage fehlgeschlagen: ' . ($err['message'] ?? 'Unbekannter Fehler'));
+            throw new RuntimeException('OpenAI-Anfrage fehlgeschlagen (Netzwerkfehler): ' . ($err['message'] ?? 'Unbekannter Fehler'));
         }
 
         $response = json_decode($raw, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Ungültige OpenAI-Antwort: ' . json_last_error_msg());
+            throw new RuntimeException('Ungültige OpenAI-Antwort (kein JSON): ' . $raw);
         }
 
         if (isset($response['error'])) {
